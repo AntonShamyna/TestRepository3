@@ -6,9 +6,10 @@
 ## 1. Цель работы
 
 1. Построить **интерактивную** модель движения тела, брошенного под углом к горизонту.
-2. Управлять параметрами в реальном времени: \(v_0\), \(\alpha\), \(g\), \(y_0\), \(k\).
-3. Сравнивать траектории без сопротивления и с сопротивлением воздуха.
-4. Сделать интерфейс наглядным и визуально «игровым»: тёмная тема, HUD-панель, цель, цветовые акценты.
+2. Управлять параметрами модели в реальном времени: \(v_0\), \(\alpha\), \(g\), \(y_0\), \(k\).
+3. Сравнивать траектории **без сопротивления** и **с сопротивлением воздуха**.
+4. Наблюдать влияние сопротивления воздуха на время полёта, дальность и максимальную высоту.
+5. Использовать фиксированный масштаб графиков и ручные регуляторы масштаба для корректного визуального сравнения.
 
 ---
 
@@ -21,6 +22,8 @@
 \]
 
 ### 2.2. С линейным сопротивлением воздуха
+
+Введём коэффициент сопротивления \(k\) (в 1/с). Тогда:
 
 \[
 \dot x = v_x,
@@ -38,21 +41,27 @@
 x(0)=0,\; y(0)=y_0,\; v_x(0)=v_0\cos\alpha,\; v_y(0)=v_0\sin\alpha.
 \]
 
+При \(k=0\) получаем классическую модель без сопротивления.
+
 ---
 
-## 3. Что нового в интерфейсе
+## 3. Что делает виртуальная лаборатория
 
-- Тёмная «игровая» тема и неоновая траектория.
-- Фон сцены с «землёй», визуальной целью и маркером текущей позиции.
-- HUD-панель с ключевыми метриками (\(T\), \(H_{\max}\), \(L\), скорость).
-- Цветовая индикация силы сопротивления воздуха.
-- Фиксированный масштаб + ручные регуляторы для честного сравнения экспериментов.
+После запуска кода вы получаете:
+
+- ползунки для изменения \(v_0\), \(\alpha\), \(g\), \(y_0\), \(k\);
+- анимацию полёта точки по траектории;
+- вектор скорости в текущий момент времени;
+- графики \(x(t)\), \(y(t)\), \(v_y(t)\);
+- численный расчёт \(T\), \(H_{\max}\), \(L\) с учётом сопротивления;
+- фиксированный масштаб графиков и отдельные регуляторы масштаба;
+- возможность поставить \(k=0\) и сравнить с идеальным случаем.
 
 ---
 
 ## 4. Код виртуальной лабораторной работы (Wolfram Mathematica)
 
-> Скопируйте код в Mathematica Notebook и выполните целиком.
+> Скопируйте код в ноутбук Mathematica и выполните целиком.
 
 ```wolfram
 ClearAll["Global`*"];
@@ -77,19 +86,11 @@ solutionFunctions[v0_, α_, g_, y0_, k_, tMax_] :=
 
 flightTimeFromY[yf_, tMax_] :=
  Module[{root},
-  root = Quiet@Check[t /. FindRoot[yf[t] == 0, {t, 10^-4, tMax}], Missing["NoRoot"]];
+  root = Quiet@Check[
+     t /. FindRoot[yf[t] == 0, {t, 10^-4, tMax}],
+     Missing["NoRoot"]
+     ];
   If[NumericQ[root] && 0 <= root <= tMax, root, tMax]
-  ];
-
-(* ===== Вспомогательные элементы стиля ===== *)
-hudCell[label_, value_, col_: White] :=
- Framed[
-  Column[{Style[label, 10, GrayLevel[.8], FontFamily -> "Source Sans Pro"],
-    Style[value, 14, Bold, col, FontFamily -> "Source Sans Pro"]}, Spacings -> .2],
-  Background -> RGBColor[0.10, 0.12, 0.16],
-  FrameStyle -> Directive[GrayLevel[.3], Thickness[.002]],
-  RoundingRadius -> 8,
-  FrameMargins -> {{8, 8}, {5, 5}}
   ];
 
 Manipulate[
@@ -98,20 +99,15 @@ Manipulate[
    xF, yF, vxF, vyF,
    T, H, L,
    tNow, xt, yt, vxt, vyt, speed,
-   tGrid,
-   xTop, yTop, tPlotMax, vyTop,
-   tRootMax,
-   trajPlot, pointPlot, sceneOverlay,
+   tGrid, trajPlot, pointPlot,
    graphX, graphY, graphVy,
    rangePlot, rangeTable, anglesDeg,
-   bgColor, glowColor, dragColor, targetX
+   xTop, yTop, tPlotMax, vyTop,
+   tRootMax
    },
 
-  bgColor = RGBColor[0.05, 0.07, 0.11];
-  glowColor = RGBColor[0.25, 0.95, 1.0];
-  dragColor = Blend[{RGBColor[0.2, 1, 0.5], RGBColor[1, 0.45, 0.2]}, Rescale[kDrag, {0, 0.6}]];
-
   tRootMax = Max[2, tSolveMax];
+
   {xF, yF, vxF, vyF} = solutionFunctions[v0, α, g, y0, kDrag, tRootMax];
 
   T = flightTimeFromY[yF, tRootMax];
@@ -119,91 +115,69 @@ Manipulate[
   L = Quiet@Check[xF[T], 0];
 
   tNow = Min[tAnim, T];
-  xt = xF[tNow]; yt = yF[tNow];
-  vxt = vxF[tNow]; vyt = vyF[tNow];
+  xt = xF[tNow];
+  yt = yF[tNow];
+  vxt = vxF[tNow];
+  vyt = vyF[tNow];
   speed = Sqrt[vxt^2 + vyt^2];
 
   xTop = Max[10, xWindow];
   yTop = Max[5, yWindow];
   tPlotMax = Max[1, tWindow];
   vyTop = Max[5, vyWindow];
-  targetX = 0.85 xTop;
 
-  tGrid = Subdivide[0, T, 280];
+  tGrid = Subdivide[0, T, 250];
 
   trajPlot = ListLinePlot[
     Transpose[{xF /@ tGrid, yF /@ tGrid}],
-    PlotStyle -> {Directive[glowColor, Thick]},
-    Filling -> Axis,
-    FillingStyle -> Directive[Opacity[.12, glowColor]],
-    AxesLabel -> {Style["x, м", 12, White], Style["y, м", 12, White]},
-    PlotLabel -> Style["PROJECTILE ARENA", 14, Bold, RGBColor[0.7, 0.95, 1]],
-    GridLines -> {Range[0, xTop, xTop/10], Range[0, yTop, yTop/8]},
-    GridLinesStyle -> Directive[Opacity[.15, White]],
+    PlotStyle -> {Thick, Blue},
+    AxesLabel -> {"x, м", "y, м"},
+    PlotLabel -> "Траектория и текущее положение",
+    GridLines -> Automatic,
     PlotRange -> {{0, xTop}, {0, yTop}},
-    Background -> bgColor,
-    AxesStyle -> Directive[White, 11],
-    ImageSize -> 560
+    ImageSize -> 520
     ];
 
-  sceneOverlay = Graphics[
+  pointPlot = Graphics[
     {
-     (* земля *)
-     Directive[RGBColor[0.15, 0.22, 0.16], Opacity[.9]],
-     Rectangle[{0, -0.03 yTop}, {xTop, 0}],
-
-     (* "цель" *)
-     Directive[RGBColor[1, 0.75, 0.1], Thick],
-     Circle[{targetX, 0.08 yTop}, 0.05 yTop],
-     Circle[{targetX, 0.08 yTop}, 0.025 yTop],
-     PointSize[0.018], Point[{targetX, 0.08 yTop}],
-
-     (* текущая точка и вектор скорости *)
-     Directive[RGBColor[1, 0.3, 0.4]], PointSize[0.022], Point[{xt, yt}],
-     Directive[dragColor, Thick],
+     Red, PointSize[0.02], Point[{xt, yt}],
+     Darker@Green,
      Arrow[{{xt, yt}, {xt + arrowScale vxt, yt + arrowScale vyt}}],
-
-     (* след-ореол вокруг точки *)
-     Directive[Opacity[.25, RGBColor[1, 0.4, 0.6]]], Disk[{xt, yt}, 0.015 xTop]
+     Black,
+     Inset[
+      Style[Row[{"v = ", NumberForm[speed, {5, 2}], " м/с"}], 12, Bold],
+      {0.80 xTop, 0.90 yTop}
+      ]
      }
     ];
 
   graphX = Plot[
     xF[t], {t, 0, T},
-    PlotStyle -> {Thick, RGBColor[0.95, 0.35, 0.35]},
-    PlotLabel -> Style["x(t)", 12, Bold, White],
-    AxesLabel -> {Style["t, c", White], Style["x, м", White]},
+    PlotStyle -> Red,
+    PlotLabel -> "x(t)",
+    AxesLabel -> {"t, c", "x, м"},
     PlotRange -> {{0, tPlotMax}, {0, xTop}},
     GridLines -> Automatic,
-    GridLinesStyle -> Directive[Opacity[.14, White]],
-    Background -> bgColor,
-    AxesStyle -> White,
     ImageSize -> 250
     ];
 
   graphY = Plot[
     yF[t], {t, 0, T},
-    PlotStyle -> {Thick, RGBColor[0.3, 0.8, 1.0]},
-    PlotLabel -> Style["y(t)", 12, Bold, White],
-    AxesLabel -> {Style["t, c", White], Style["y, м", White]},
+    PlotStyle -> Darker@Blue,
+    PlotLabel -> "y(t)",
+    AxesLabel -> {"t, c", "y, м"},
     PlotRange -> {{0, tPlotMax}, {0, yTop}},
     GridLines -> Automatic,
-    GridLinesStyle -> Directive[Opacity[.14, White]],
-    Background -> bgColor,
-    AxesStyle -> White,
     ImageSize -> 250
     ];
 
   graphVy = Plot[
     vyF[t], {t, 0, T},
-    PlotStyle -> {Thick, dragColor},
-    PlotLabel -> Style["vy(t)", 12, Bold, White],
-    AxesLabel -> {Style["t, c", White], Style["vy, м/с", White]},
+    PlotStyle -> Purple,
+    PlotLabel -> "vy(t)",
+    AxesLabel -> {"t, c", "vy, м/с"},
     PlotRange -> {{0, tPlotMax}, {-vyTop, vyTop}},
     GridLines -> Automatic,
-    GridLinesStyle -> Directive[Opacity[.14, White]],
-    Background -> bgColor,
-    AxesStyle -> White,
     ImageSize -> 250
     ];
 
@@ -220,51 +194,47 @@ Manipulate[
 
   rangePlot = ListLinePlot[
     rangeTable,
-    PlotStyle -> {Thick, RGBColor[1.0, 0.65, 0.15]},
+    PlotStyle -> {Thick, Orange},
     PlotMarkers -> Automatic,
-    AxesLabel -> {Style["Угол, град", White], Style["Дальность, м", White]},
-    PlotLabel -> Style["Range vs Angle", 12, Bold, White],
+    AxesLabel -> {"Угол, град", "Дальность, м"},
+    PlotLabel -> "Зависимость дальности от угла (с сопротивлением)",
     GridLines -> Automatic,
-    GridLinesStyle -> Directive[Opacity[.14, White]],
     PlotRange -> {{0, 90}, {0, xTop}},
-    Background -> bgColor,
-    AxesStyle -> White,
-    ImageSize -> 560,
+    ImageSize -> 520,
     Epilog -> {
-      RGBColor[1, 0.3, 0.4], PointSize[0.02], Point[{α/Degree, N@L}],
-      White,
-      Text[Style["Текущая конфигурация", 10, Bold], {Min[88, α/Degree + 7], Min[0.9 xTop, N@L + 0.06 xTop]}]
+      Red, PointSize[0.02], Point[{α/Degree, N@L}],
+      Black,
+      Text[
+       Style[Row[{"текущий угол = ", NumberForm[α/Degree, {3, 1}], "°"}], 11, Bold],
+       {Min[88, α/Degree + 5], Min[0.95 xTop, N@L + 0.05 xTop]}
+       ]
       }
     ];
 
-  Framed[
-   Column[
+  Column[
    {
-    Style["🎮 Виртуальная лаборатория: Projectile Arena (с сопротивлением воздуха)", 16, Bold, White],
+    Style["Виртуальная лаборатория: бросок под углом (с сопротивлением воздуха)", 15, Bold],
 
-    Row[
+    Grid[
      {
-      hudCell["Коэффициент сопротивления k", Row[{NumberForm[kDrag, {4, 3}], " 1/с"}], dragColor],
-      Spacer[8],
-      hudCell["Время полёта T", Row[{NumberForm[T, {6, 3}], " c"}], RGBColor[0.6, 0.9, 1]],
-      Spacer[8],
-      hudCell["Макс. высота Hmax", Row[{NumberForm[H, {6, 3}], " м"}], RGBColor[0.5, 1, 0.75]],
-      Spacer[8],
-      hudCell["Дальность L", Row[{NumberForm[L, {6, 3}], " м"}], RGBColor[1, 0.82, 0.35]],
-      Spacer[8],
-      hudCell["Скорость |v|", Row[{NumberForm[speed, {6, 2}], " м/с"}], RGBColor[1, 0.55, 0.55]]
-      }
+      {"Коэффициент сопротивления k (1/с)", NumberForm[kDrag, {5, 3}]},
+      {"Время полёта T (с)", NumberForm[T, {7, 3}]},
+      {"Максимальная высота Hmax (м)", NumberForm[H, {7, 3}]},
+      {"Дальность L (м)", NumberForm[L, {7, 3}]},
+      {"Текущее время t (с)", NumberForm[tNow, {7, 3}]},
+      {"Текущие координаты (x, y)",
+       Row[{"(", NumberForm[xt, {6, 2}], ", ", NumberForm[yt, {6, 2}], ")"}]}
+      },
+     Frame -> All,
+     ItemSize -> All,
+     Background -> {None, {{Lighter[Gray, 0.93], White}}}
      ],
 
-    Show[trajPlot, sceneOverlay],
+    Show[trajPlot, pointPlot],
     GraphicsRow[{graphX, graphY, graphVy}, Spacings -> 10],
     rangePlot
     },
    Spacings -> 1.2
-   ],
-   Background -> bgColor,
-   FrameStyle -> None,
-   FrameMargins -> 8
    ]
   ],
 
@@ -302,16 +272,18 @@ Manipulate[
 
 ---
 
-## 5. Как работать
+## 5. Инструкция по выполнению лабораторной
 
-1. Запустите модуль и убедитесь, что интерфейс отображается в тёмной теме.
-2. Для классического случая поставьте `k = 0`.
-3. Для «игрового» сравнения увеличивайте `k` и наблюдайте изменение траектории/скорости/дальности.
-4. Используйте фиксированный масштаб, чтобы визуально честно сравнивать разные запуски.
+1. Запустите интерактивный модуль.
+2. Установите базовые параметры: \(v_0=20\) м/с, \(\alpha=45^\circ\), \(g=9.81\), \(y_0=0\).
+3. Поставьте `k = 0` и зафиксируйте значения \(T\), \(H_{\max}\), \(L\).
+4. Постепенно увеличивайте `k` (например 0.05, 0.10, 0.20, 0.30) и наблюдайте, как уменьшаются дальность и высота.
+5. Для сравнения опытов удерживайте одинаковые значения регуляторов масштаба.
+6. При необходимости увеличьте `Максимальное время расчёта`, если траектория при малых скоростях долго падает на землю.
 
 ---
 
-## 6. Таблица для отчёта
+## 6. Таблица для отчёта (шаблон)
 
 | № опыта | \(v_0\), м/с | \(\alpha\), град | \(y_0\), м | \(g\), м/с² | \(k\), 1/с | \(T\), с | \(H_{\max}\), м | \(L\), м |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -323,6 +295,16 @@ Manipulate[
 
 ---
 
-## 7. Вывод (пример)
+## 7. Контрольные вопросы
 
-Графически улучшенный интерфейс сделал лабораторную более наглядной: тёмная игровая сцена, HUD и цветовые подсказки позволяют быстрее понимать влияние сопротивления воздуха на траекторию и кинематические параметры.
+1. Почему при увеличении коэффициента сопротивления \(k\) дальность полёта уменьшается?
+2. Как изменяется график \(v_y(t)\) при росте \(k\)?
+3. Почему при \(k=0\) модель переходит к классической параболе?
+4. Какие ограничения имеет модель линейного сопротивления?
+5. Почему полезно сравнивать опыты в одинаковом масштабе графиков?
+
+---
+
+## 8. Вывод (пример)
+
+В виртуальной лаборатории исследовано движение тела, брошенного под углом к горизонту, с учётом линейного сопротивления воздуха. Численное моделирование показало, что при увеличении коэффициента сопротивления уменьшаются максимальная высота, дальность и время активного набора высоты. Фиксированный масштаб графиков позволил корректно сравнить траектории и наглядно оценить влияние сопротивления.
